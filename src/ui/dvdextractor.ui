@@ -3,11 +3,35 @@
 <interface>
   <!-- interface-name dvdextractor.ui -->
   <requires lib="gio" version="2.0"/>
-  <requires lib="gtk" version="4.6"/>
+  <requires lib="gtk" version="4.12"/>
   <object class="GtkApplicationWindow" id="MainAppWindow">
     <property name="child">
-      <object class="GtkLabel">
-        <property name="label">Hello World</property>
+      <object class="GtkPaned" id="MainPane">
+        <property name="end-child">
+          <object class="GtkButton" id="StartExtractionBtn">
+            <property name="label">StartExtraction</property>
+          </object>
+        </property>
+        <property name="orientation">vertical</property>
+        <property name="resize-end-child">False</property>
+        <property name="start-child">
+          <object class="GtkPaned">
+            <property name="end-child">
+              <object class="GtkListBox" id="ConfigsListBox"/>
+            </property>
+            <property name="resize-end-child">False</property>
+            <property name="start-child">
+              <object class="GtkScrolledWindow">
+                <property name="child">TitleListBox</property>
+                <child>
+                  <object class="GtkListBox" id="TitleListBox">
+                    <property name="selection-mode">none</property>
+                  </object>
+                </child>
+              </object>
+            </property>
+          </object>
+        </property>
       </object>
     </property>
     <property name="default-height">720</property>

@@ -1,4 +1,5 @@
 import os.path
+from typing import Dict, Any
 
 import dvdread
 
@@ -38,3 +39,22 @@ class DvdManager:
                 f"{title.NumberOfChapters} chapters, {title.NumberOfSubpictures} subpictures, "
                 f"and runs for {title.PlaybackTimeFancy}"
             )
+
+    def create_title_dict(self, title_num) -> Dict[str, Any]:
+        title = None
+        for t in self._titleList:
+            if t.TitleNum == title_num:
+                title = t
+                break
+
+        if not title:
+            raise ValueError(f"Title {title_num} not found")
+
+        title_data = {
+            'title_num': title.TitleNum,
+            'title_length': title.PlaybackTimeFancy,
+            'file_path': os.path.abspath(self.path),
+            'base_stem': os.path.splitext(os.path.basename(self.path))[0],
+        }
+
+        return title_data
