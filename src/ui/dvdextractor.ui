@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!-- Created with Cambalache 0.90.2 -->
+<interface>
+  <!-- interface-name dvdextractor.ui -->
+  <requires lib="gio" version="2.0"/>
+  <requires lib="gtk" version="4.6"/>
+  <object class="GtkApplicationWindow" id="MainAppWindow">
+    <property name="child">
+      <object class="GtkLabel">
+        <property name="label">Hello World</property>
+      </object>
+    </property>
+    <property name="default-height">720</property>
+    <property name="default-width">1280</property>
+    <property name="show-menubar">True</property>
+  </object>
+  <menu id="MainMenu">
+    <submenu id="FileMenu">
+      <attribute name="label">File</attribute>
+      <item>
+        <attribute name="action">app.selectFile</attribute>
+        <attribute name="label">Select Dvd File</attribute>
+      </item>
+      <item>
+        <attribute name="action">app.quit</attribute>
+        <attribute name="label">Close</attribute>
+      </item>
+    </submenu>
+  </menu>
+</interface>
