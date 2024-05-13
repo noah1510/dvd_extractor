@@ -36,10 +36,6 @@ class Title:
         }
 
     @staticmethod
-    def from_dvd_title(dvd_title, path):
-        return
-
-    @staticmethod
     def get_all_titles(path):
         if not path:
             raise ValueError("No path provided")

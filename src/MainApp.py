@@ -4,7 +4,7 @@ import os
 import gi
 import cairo
 
-from src import VideoExtractor
+from src.TaskManager import TaskManager
 from src.TitleFinder import Title
 
 gi.require_version("Gtk", "4.0")
@@ -107,18 +107,12 @@ class MainApp(Gtk.Application):
         print("Starting extraction")
 
         output_dir = self.config_manager.output_dir
-        if not output_dir:
-            output_dir = os.path.dirname(self.dvd_manager.path)
 
-        handbrake_params = {}
-        selected_title_dicts = [self.raw_title_list[title].as_dict() for title in self.selected_titles]
-        for title_dict in selected_title_dicts:
-            handbrake_params[title_dict['title_num']] = self.config_manager.get_handbrake_options(title_dict)
+        for title in self.selected_titles:
+            print(f"Selected title: {title}")
+            TaskManager.add_task(self.config_manager.get_handbrake_task(self.raw_title_list[title], output_dir))
 
-        ffmpeg_params = self.config_manager.get_ffmpeg_concat_options(selected_title_dicts)
-
-        multiprocessing.Process(
-            target=VideoExtractor.execute_extraction,
-            args=(handbrake_params, ffmpeg_params, self.config_manager.keep_individual_titles, output_dir)
-        ).start()
-
+        selected_titles_list = [self.raw_title_list[title] for title in self.selected_titles]
+        concat_task = self.config_manager.get_concat_task(selected_titles_list, output_dir)
+        if concat_task:
+            TaskManager.add_task(concat_task)

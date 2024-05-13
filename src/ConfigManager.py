@@ -4,8 +4,78 @@ from typing import Dict, List
 import jinja2
 import gi
 
+from src.TaskManager import Task
+from src.TitleFinder import Title
+
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gio, Gdk
+
+
+class HandbrakeExtractTask(Task):
+    def __init__(self, title: Title, config_options: Dict, output_dir):
+        super().__init__()
+
+        self.title = title
+        self.config_options = config_options
+        if output_dir is None:
+            self._cwd = os.path.dirname(title.path)
+        else:
+            self._cwd = output_dir
+
+    def execute(self):
+        title_dict = self.title.as_dict()
+        outfile = jinja2.Template(self.config_options['individual_title_name_template']).render(**title_dict)
+
+        args = [
+            "-e", self.config_options['video_encoder'],
+            "-q", str(float(self.config_options['quality'])),
+            "--encoder-preset", self.config_options['encoder_preset'],
+            "-E", self.config_options['audio_encoder'],
+            "-t", str(int(title_dict['title_num'])),
+            "--markers",
+            "--all-audio",
+            "--all-subtitles",
+            str(self.config_options['handbrake_extra_options']),
+            "-i", f"{title_dict['file_path']}",
+            "-o", f"{outfile}"
+        ]
+
+        self._internal_execute(["HandBrakeCLI", *args])
+
+
+class FFmpegConcatTask(Task):
+    def __init__(self, titles: List[Title], config_options: Dict, output_dir):
+        super().__init__()
+
+        self.titles = titles
+        self.config_options = config_options
+        if output_dir is None:
+            self._cwd = os.path.dirname(titles[0].path)
+        else:
+            self._cwd = output_dir
+
+    def execute(self):
+        concat_file_str = ''
+        for title in self.titles:
+            title_dict = title.as_dict()
+            title_filename = jinja2.Template(self.config_options['individual_title_name_template']).render(**title_dict)
+            concat_file_str += f"file '{title_filename}'\n"
+
+        title_0 = self.titles[0]
+        outfile = jinja2.Template(self.config_options['concatenated_title_name_template']).render(**title_0.as_dict())
+        concat_file_name = f"{title_0.base_stem}.txt"
+
+        with open(concat_file_name, 'w') as f:
+            f.write(concat_file_str)
+
+        args = [
+            "-f", "concat",
+            "-i", concat_file_name,
+            "-c", "copy",
+            f"{outfile}"
+        ]
+
+        self._internal_execute(["ffmpeg", *args])
 
 
 class ConfigManager:
@@ -130,57 +200,31 @@ class ConfigManager:
         except Exception as e:
             pass
 
-    def get_handbrake_options(self, title_data: Dict) -> List[str]:
-
-        outfile = self.get_individual_title_name(title_data)
-
-        args = [
-            "-e", self.video_encoder_text.get_text(),
-            "-q", str(float(self.quality_text.get_text())),
-            "--encoder-preset", self.encoder_preset_text.get_text(),
-            "-E", self.audio_encoder_text.get_text(),
-            "-t", str(int(title_data['title_num'])),
-            "--markers",
-            str(self.handbrake_options_text.get_text()),
-            "-i", f"{title_data['file_path']}",
-            "-o", f"{outfile}"
-        ]
-
-        return args
-
-    def get_ffmpeg_concat_options(self, titles: List[Dict]) -> Dict:
-        if not self.concatenate_titles:
-            return {}
-
-        if not titles:
-            return {}
-
-        if len(titles) == 1:
-            return {}
-
-        concat_file_str = ''
-        for title in titles:
-            concat_file_str += f"file '{self.get_individual_title_name(title)}'\n"
-
-        title_0 = titles[0]
-        outfile = self.get_concat_file_name(title_0)
-        concat_file_name = f"{title_0['base_stem']}.txt"
-
+    def get_current_config(self) -> Dict:
         return {
-            'concat_file_name': concat_file_name,
-            'concat_file_str': concat_file_str,
-            'options': [
-                "-f", "concat",
-                "-i", concat_file_name,
-                "-c", "copy",
-                f"{outfile}"
-            ]
+            'keep_individual_titles': self.keep_individual_titles,
+            'concatenate_titles': self.concatenate_titles,
+            'video_encoder': self.video_encoder_text.get_text(),
+            'quality': self.quality_text.get_text(),
+            'encoder_preset': self.encoder_preset_text.get_text(),
+            'audio_encoder': self.audio_encoder_text.get_text(),
+            'output_dir': self.output_dir,
+            'individual_title_name_template': self.individual_title_name_text.get_text(),
+            'concatenated_title_name_template': self.concatenated_title_name_text.get_text(),
+            'handbrake_extra_options': self.handbrake_options_text.get_text()
         }
 
-    def get_individual_title_name(self, title_data: Dict) -> str:
-        jinja_template = jinja2.Template(self.individual_title_name_text.get_text())
-        return jinja_template.render(**title_data)
+    def get_handbrake_task(self, title_data: Title, output_dir=None) -> HandbrakeExtractTask:
+        return HandbrakeExtractTask(title_data, self.get_current_config(), output_dir)
 
-    def get_concat_file_name(self, title_data: Dict) -> str:
-        jinja_template = jinja2.Template(self.concatenated_title_name_text.get_text())
-        return jinja_template.render(**title_data)
+    def get_concat_task(self, titles: List[Title], output_dir=None) -> FFmpegConcatTask or None:
+        if not self.concatenate_titles:
+            return None
+
+        if not titles:
+            return None
+
+        if len(titles) == 1:
+            return None
+
+        return FFmpegConcatTask(titles, self.get_current_config(), output_dir)
