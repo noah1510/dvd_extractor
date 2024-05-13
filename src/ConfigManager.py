@@ -17,7 +17,7 @@ class ConfigManager:
         self.concatenate_titles = True
 
         self.video_encoder = "svt_av1"
-        self.quality = "22"
+        self.quality = "32"
         self.encoder_preset = "8"
 
         self.audio_encoder = "opus"
@@ -99,6 +99,11 @@ class ConfigManager:
         self.audio_encoder_text.set_text(self.audio_encoder)
         self.configs_list_box.append(self.audio_encoder_text)
 
+        self.configs_list_box.append(Gtk.Label(label="Extra Handbrake options:"))
+        self.handbrake_options_text = Gtk.Text()
+        self.handbrake_options_text.set_text("")
+        self.configs_list_box.append(self.handbrake_options_text)
+
         self.configs_list_box.append(Gtk.Separator())
 
     def __toggle_keep_individual(self, btn):
@@ -136,34 +141,41 @@ class ConfigManager:
             "-E", self.audio_encoder_text.get_text(),
             "-t", str(int(title_data['title_num'])),
             "--markers",
+            str(self.handbrake_options_text.get_text()),
             "-i", f"{title_data['file_path']}",
             "-o", f"{outfile}"
         ]
 
         return args
 
-    def get_ffmpeg_concat_options(self, titles: Dict) -> List[str]:
+    def get_ffmpeg_concat_options(self, titles: List[Dict]) -> Dict:
         if not self.concatenate_titles:
-            return []
+            return {}
 
         if not titles:
-            return []
+            return {}
 
         if len(titles) == 1:
-            return []
+            return {}
 
-        concat_option = "concat:"
-        for title in titles.values():
-            concat_option += f"{self.get_individual_title_name(title)}|"
+        concat_file_str = ''
+        for title in titles:
+            concat_file_str += f"file '{self.get_individual_title_name(title)}'\n"
 
-        concat_option = concat_option[:-1]
-        outfile = self.get_concat_file_name(titles[next(iter(titles))])
+        title_0 = titles[0]
+        outfile = self.get_concat_file_name(title_0)
+        concat_file_name = f"{title_0['base_stem']}.txt"
 
-        return [
-            "-i", concat_option,
-            "-c", "copy",
-            f"{outfile}"
-        ]
+        return {
+            'concat_file_name': concat_file_name,
+            'concat_file_str': concat_file_str,
+            'options': [
+                "-f", "concat",
+                "-i", concat_file_name,
+                "-c", "copy",
+                f"{outfile}"
+            ]
+        }
 
     def get_individual_title_name(self, title_data: Dict) -> str:
         jinja_template = jinja2.Template(self.individual_title_name_text.get_text())

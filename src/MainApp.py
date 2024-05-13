@@ -5,7 +5,7 @@ import gi
 import cairo
 
 from src import VideoExtractor
-from src.DvdManager import DvdManager
+from src.TitleFinder import Title
 
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gio, Gdk
@@ -25,7 +25,7 @@ class MainApp(Gtk.Application):
         self.config_manager = None
         self.StartExtractionBtn = None
 
-        self.dvd_manager = None
+        self.raw_title_list = None
         self.selected_titles = None
 
     def do_activate(self):
@@ -79,28 +79,25 @@ class MainApp(Gtk.Application):
             file = source_dialog.open_finish(res).get_path()
             print(f"Selected file: {file}")
 
-            self.dvd_manager = DvdManager(file)
-            self.dvd_manager.print_title_info()
+            self.raw_title_list = Title.get_all_titles(file)
 
             self.title_list_box.remove_all()
-            self.selected_titles = {}
+            self.selected_titles = []
 
-            titles = self.dvd_manager.get_title_list()
-            for title in titles:
-                title_button = Gtk.ToggleButton(label=f"Title {title.TitleNum}")
+            for title in self.raw_title_list.values():
+                title_button = Gtk.ToggleButton(label=f"Title {title.TitleNum} [{title.PlaybackTimeFancy}]")
                 title_button.connect("toggled", self.__toggle_title, title.TitleNum)
                 title_button.set_active(True)
                 self.title_list_box.append(title_button)
 
         except Exception as e:
-            pass
+            print(e)
 
     def __toggle_title(self, btn, title_num):
-        title_str = str(title_num)
         if btn.get_active():
-            self.selected_titles[title_str] = self.dvd_manager.create_title_dict(title_num)
+            self.selected_titles.append(title_num)
         else:
-            self.selected_titles.pop(title_str)
+            self.selected_titles.remove(title_num)
 
     def __start_extraction(self, btn):
         if not self.selected_titles:
@@ -114,10 +111,11 @@ class MainApp(Gtk.Application):
             output_dir = os.path.dirname(self.dvd_manager.path)
 
         handbrake_params = {}
-        for title in self.selected_titles.values():
-            handbrake_params[title['title_num']] = self.config_manager.get_handbrake_options(title)
+        selected_title_dicts = [self.raw_title_list[title].as_dict() for title in self.selected_titles]
+        for title_dict in selected_title_dicts:
+            handbrake_params[title_dict['title_num']] = self.config_manager.get_handbrake_options(title_dict)
 
-        ffmpeg_params = self.config_manager.get_ffmpeg_concat_options(self.selected_titles)
+        ffmpeg_params = self.config_manager.get_ffmpeg_concat_options(selected_title_dicts)
 
         multiprocessing.Process(
             target=VideoExtractor.execute_extraction,
